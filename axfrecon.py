@@ -6,6 +6,8 @@ import dns.zone
 import dns.query
 import tqdm
 import os
+import traceback
+import subprocess
 from typing import Set, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -23,9 +25,36 @@ def get_dns_records(domain: str, record_type: str) -> List[str]:
     except Exception as e:
         return []
 
-def get_nameservers(domain: str) -> List[str]:
-    """获取域名的NS记录"""
-    return get_dns_records(domain, 'NS')
+def get_nameservers(domain: str) -> list:
+    """
+    查询指定域名的NS记录，返回所有域名服务器列表。
+
+    参数:
+        domain (str): 要查询的域名。
+
+    返回:
+        list: 包含所有域名服务器的列表。
+
+    异常:
+        Exception: 当dig命令执行失败或未找到时抛出。
+    """
+    cmd = ['dig', '+short', 'NS', domain]
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+    except subprocess.CalledProcessError as e:
+        raise Exception(f"dig命令执行失败，退出码 {e.returncode}：{e.stderr}") from e
+    except FileNotFoundError as e:
+        raise Exception("未找到'dig'命令，请确保已安装dnsutils（如bind-utils）包。") from e
+
+    # 处理输出，提取非空行并去除首尾空格
+    # 去除末尾的.
+    ns_list = [line.strip().rstrip('.') for line in result.stdout.splitlines() if line.strip()]
+    return ns_list
 
 def collect_subdomains_from_dns(domain: str, subdomains: Set[str]) -> None:
     """通过查询不同类型的DNS记录来收集子域名"""
@@ -61,13 +90,36 @@ def collect_subdomains_from_dns(domain: str, subdomains: Set[str]) -> None:
             except Exception as e:
                 pass
 
-def test_zone_transfer(domain, nameserver):
-    """测试指定域名在指定DNS服务器上是否存在域传送漏洞"""
+def test_zone_transfer(domain: str, nameserver: str) -> bool:
+    """
+    检测指定域名服务器是否允许区域传输（AXFR）。
+    
+    参数:
+        domain (str): 要检测的域名。
+        nameserver (str): 目标域名服务器的地址。
+    
+    返回:
+        bool: 若输出包含 "Transfer failed" 返回 False，否则返回 True。
+    
+    异常:
+        RuntimeError: 当系统未安装 `dig` 命令时抛出。
+    """
+    cmd = ["dig", f"@{nameserver}", "axfr", domain]
     try:
-        zone = dns.zone.from_xfr(dns.query.xfr(nameserver, domain, timeout=5))
-        return True, zone
-    except Exception as e:
-        return False, None
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as e:
+        raise RuntimeError("未找到 'dig' 命令，请确保已安装 dnsutils 或 bind-utils 包。") from e
+
+    # 合并标准输出和错误输出，统一检查
+    output = result.stdout + result.stderr
+    if "Transfer failed" in output or "timed out" in output:
+        return False
+    else:
+        return True
 
 @click.command()
 @click.argument('domain', required=False)
@@ -117,30 +169,18 @@ def main(domain, file, scan_subdomains, output):
         subdomains = set()
         
         if scan_subdomains:
-            # 第一步：通过DNS记录收集子域名
             click.echo("\n[*] 正在通过DNS记录收集子域名...")
             collect_subdomains_from_dns(domain, subdomains)
             if subdomains:
                 click.echo(f"\n[+] 通过DNS记录收集到 {len(subdomains)} 个子域名")
             
-            # 第二步：尝试通过域传送收集子域名
-            click.echo("\n[*] 正在尝试通过域传送收集子域名...")
-            with tqdm.tqdm(nameservers, desc="收集进度") as pbar:
-                for ns in pbar:
-                    pbar.set_description(f"正在从 {ns} 收集")
-                    _, zone = test_zone_transfer(domain, ns)
-                    if zone:
-                        for name, _ in zone.nodes.items():
-                            subdomain = str(name) + '.' + domain
-                            if subdomain.startswith('@'):
-                                subdomain = domain
-                            subdomains.add(subdomain)
-            
             if len(subdomains) > 0:
                 click.echo(f"\n[+] 总共收集到 {len(subdomains)} 个子域名")
         
         # 第二步：对所有域名进行漏洞检测
-        all_domains = list(subdomains) if subdomains else [domain]
+        all_domains = [domain]
+        if subdomains:
+            all_domains += list(subdomains)
         click.echo("\n[*] 开始进行DNS域传送漏洞检测...")
         
         with tqdm.tqdm(all_domains, desc="检测进度") as pbar:
@@ -149,7 +189,7 @@ def main(domain, file, scan_subdomains, output):
                 domain_ns = get_nameservers(test_domain)
                 if domain_ns:
                     for ns in domain_ns:
-                        is_vulnerable, _ = test_zone_transfer(test_domain, ns)
+                        is_vulnerable = test_zone_transfer(test_domain, ns)
                         if is_vulnerable:
                             vulnerable_servers.append({"domain": test_domain, "nameserver": ns})
         
