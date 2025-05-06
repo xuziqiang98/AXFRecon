@@ -9,6 +9,8 @@
 - 自动收集子域名信息
 - 实时显示检测进度
 - 将检测结果保存到文件
+- 支持从文件读取域名列表
+- 支持macOS、Linux
 
 ## 安装
 
@@ -29,8 +31,6 @@ pip install -U uv
 ```bash
 uv venv venv
 source venv/bin/activate  # Linux/macOS
-# 或者在Windows上使用：
-# venv\Scripts\activate
 ```
 
 然后使用uv安装项目依赖：

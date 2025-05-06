@@ -178,3 +178,5 @@ cython_debug/
 .DS_Store
 *.txt
 !requirements.txt
+test.py
+.vscode/
