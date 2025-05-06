@@ -45,17 +45,32 @@ chmod +x axfrecon.py
 
 ## 使用方法
 
+基本使用：
 ```bash
 ./axfrecon.py example.com
 ```
 
-或者：
-
+指定输出文件：
 ```bash
-python3 axfrecon.py example.com
+./axfrecon.py example.com -o custom_output.txt
 ```
 
-检测结果将保存在当前目录下，文件名格式为`results.txt`。
+关闭子域名扫描：
+```bash
+./axfrecon.py example.com -s false
+```
+
+从文件读取域名列表：
+```bash
+./axfrecon.py -f domains.txt
+```
+
+## 参数说明
+
+- `domain`: 要检测的域名（使用-f参数时可选）
+- `-f, --file`: 从文本文件读取域名列表（每行一个域名）
+- `-s, --scan-subdomains`: 是否开启子域名扫描（默认开启，使用-f参数时默认关闭）
+- `-o, --output`: 指定输出文件路径（默认为results.txt）
 
 ## 输出示例
 
