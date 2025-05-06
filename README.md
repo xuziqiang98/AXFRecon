@@ -69,7 +69,7 @@ chmod +x axfrecon.py
 
 - `domain`: 要检测的域名（使用-f参数时可选）
 - `-f, --file`: 从文本文件读取域名列表（每行一个域名）
-- `-s, --scan-subdomains`: 是否开启子域名扫描（默认开启，使用-f参数时默认关闭）
+- `-s, --scan-subdomains`: 是否开启子域名扫描（默认开启）
 - `-o, --output`: 指定输出文件路径（默认为results.txt）
 
 ## 输出示例
