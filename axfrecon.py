@@ -72,27 +72,29 @@ def test_zone_transfer(domain, nameserver):
 @click.command()
 @click.argument('domain', required=False)
 @click.option('-f', '--file', help='从文本文件读取域名列表（每行一个域名）')
-@click.option('-s', '--scan-subdomains', is_flag=True, default=True, help='是否开启子域名扫描（默认开启）')
+@click.option('-s', '--scan-subdomains', default=True, help='是否开启子域名扫描（默认开启）')
 @click.option('-o', '--output', default='results.txt', help='指定输出文件路径（默认为results.txt）')
 def main(domain, file, scan_subdomains, output):
     """DNS域传送漏洞检测工具"""
     domains = []
     
+    def remove_www_prefix(domain: str) -> str:
+        """移除域名开头的www.前缀"""
+        return domain[4:] if domain.startswith('www.') else domain
+
     # 从文件读取域名或使用命令行参数
     if file:
         try:
             with open(file, 'r') as f:
-                domains = [line.strip() for line in f if line.strip()]
+                domains = [remove_www_prefix(line.strip()) for line in f if line.strip()]
             if not domains:
                 click.echo("[!] 文件中未找到有效域名")
                 return
-            # 从文件读取域名时默认关闭子域名扫描
-            scan_subdomains = False
         except Exception as e:
             click.echo(f"[!] 读取文件失败: {str(e)}")
             return
     elif domain:
-        domains = [domain]
+        domains = [remove_www_prefix(domain)]
     else:
         click.echo("[!] 请提供域名或域名列表文件")
         return
