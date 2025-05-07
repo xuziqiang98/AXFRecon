@@ -142,14 +142,35 @@ def main(domain, file, scan_subdomains, output):
                 domains = [remove_www_prefix(line.strip()) for line in f if line.strip()]
             if not domains:
                 click.echo("[!] 文件中未找到有效域名")
+                # 创建一个空结果文件
+                try:
+                    with open(output, 'w') as f:
+                        f.write("[!] 文件中未找到有效域名\n")
+                    click.echo(f"[+] 结果已保存到: {output}")
+                except Exception as e:
+                    click.echo(f"[!] 无法创建输出文件: {str(e)}")
                 return
         except Exception as e:
             click.echo(f"[!] 读取文件失败: {str(e)}")
+            # 创建一个错误报告文件
+            try:
+                with open(output, 'w') as f:
+                    f.write(f"[!] 读取文件失败: {str(e)}\n")
+                click.echo(f"[+] 结果已保存到: {output}")
+            except Exception as e:
+                click.echo(f"[!] 无法创建输出文件: {str(e)}")
             return
     elif domain:
         domains = [remove_www_prefix(domain)]
     else:
         click.echo("[!] 请提供域名或域名列表文件")
+        # 创建一个错误报告文件
+        try:
+            with open(output, 'w') as f:
+                f.write("[!] 未提供域名或域名列表文件\n")
+            click.echo(f"[+] 结果已保存到: {output}")
+        except Exception as e:
+            click.echo(f"[!] 无法创建输出文件: {str(e)}")
         return
     
     for domain in domains:
@@ -197,35 +218,38 @@ def main(domain, file, scan_subdomains, output):
         # 输出结果
         click.echo("\n[*] 检测完成")
         
-        # 保存结果到文件
-        with open(output, 'a+') as f:
-            f.write(f"域名: {domain}\n")
+        # 保存结果到文件 - 添加异常处理
+        try:
+            with open(output, 'a+') as f:
+                f.write(f"域名: {domain}\n")
+                
+                # 输出子域名收集结果
+                f.write("\n[收集到的子域名]\n")
+                if subdomains:
+                    for subdomain in sorted(subdomains):
+                        f.write(f"{subdomain}\n")
+                else:
+                    f.write("未收集到子域名\n")
+                
+                # 输出漏洞检测结果
+                f.write("\n[漏洞检测结果]\n")
+                if vulnerable_servers:
+                    for result in vulnerable_servers:
+                        f.write(f"域名: {result['domain']}\n")
+                        f.write(f"存在漏洞的DNS服务器: {result['nameserver']}\n\n")
+                else:
+                    f.write("未发现存在域传送漏洞的DNS服务器\n")
+                f.write("-" * 30 + "\n")
             
-            # 输出子域名收集结果
-            f.write("\n[收集到的子域名]\n")
-            if subdomains:
-                for subdomain in sorted(subdomains):
-                    f.write(f"{subdomain}\n")
-            else:
-                f.write("未收集到子域名\n")
-            
-            # 输出漏洞检测结果
-            f.write("\n[漏洞检测结果]\n")
+            # 输出到控制台
             if vulnerable_servers:
+                click.echo("\n[!] 发现存在漏洞的DNS服务器:")
                 for result in vulnerable_servers:
-                    f.write(f"域名: {result['domain']}\n")
-                    f.write(f"存在漏洞的DNS服务器: {result['nameserver']}\n\n")
+                    click.echo(f"    - {result['domain']} -> {result['nameserver']}")
             else:
-                f.write("未发现存在域传送漏洞的DNS服务器\n")
-            f.write("-" * 30 + "\n")
-        
-        # 输出到控制台
-        if vulnerable_servers:
-            click.echo("\n[!] 发现存在漏洞的DNS服务器:")
-            for result in vulnerable_servers:
-                click.echo(f"    - {result['domain']} -> {result['nameserver']}")
-        else:
-            click.echo("\n[+] 未发现存在域传送漏洞的DNS服务器")
+                click.echo("\n[+] 未发现存在域传送漏洞的DNS服务器")
+        except Exception as e:
+            click.echo(f"[!] 保存结果到文件失败: {str(e)}")
     
     click.echo(f"\n[+] 结果已保存到: {output}")
 
