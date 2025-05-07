@@ -116,7 +116,12 @@ def test_zone_transfer(domain: str, nameserver: str) -> bool:
     
     # 合并标准输出和错误输出，统一检查
     output = result.stdout + result.stderr
-    failed_features = ["Transfer failed", "timed out", "network unreachable", "host unreachable", "not found", "connection refused"]
+    failed_features = ["Transfer failed", 
+                       "timed out", 
+                       "network unreachable", 
+                       "host unreachable", 
+                       "not found", 
+                       "connection refused"]
     for feature in failed_features:
         if feature in result.stdout or feature in result.stderr:
             return False
@@ -173,15 +178,45 @@ def main(domain, file, scan_subdomains, output):
             click.echo(f"[!] 无法创建输出文件: {str(e)}")
         return
     
+    # 初始化结果文件（如果需要）
+    try:
+        # 如果文件不存在，创建一个新文件
+        if not os.path.exists(output):
+            with open(output, 'w') as f:
+                f.write("# DNS域传送漏洞检测结果\n\n")
+    except Exception as e:
+        click.echo(f"[!] 无法初始化输出文件: {str(e)}")
+        return
+    
     for domain in domains:
         click.echo(f"\n[*] 开始检测域名: {domain}")
         
         # 获取域名的NS记录
         click.echo("\n[*] 正在获取NS记录...")
-        nameservers = get_nameservers(domain)
+        try:
+            nameservers = get_nameservers(domain)
+        except Exception as e:
+            click.echo(f"[!] 获取NS记录失败: {str(e)}")
+            # 记录错误到文件
+            try:
+                with open(output, 'a+') as f:
+                    f.write(f"域名: {domain}\n")
+                    f.write(f"[!] 获取NS记录失败: {str(e)}\n")
+                    f.write("-" * 30 + "\n")
+            except Exception as write_err:
+                click.echo(f"[!] 保存结果到文件失败: {str(write_err)}")
+            continue
         
         if not nameservers:
             click.echo(f"[!] 未找到域名 {domain} 的NS记录")
+            # 记录到文件
+            try:
+                with open(output, 'a+') as f:
+                    f.write(f"域名: {domain}\n")
+                    f.write("[!] 未找到NS记录\n")
+                    f.write("-" * 30 + "\n")
+            except Exception as write_err:
+                click.echo(f"[!] 保存结果到文件失败: {str(write_err)}")
             continue
     
         click.echo(f"[+] 发现 {len(nameservers)} 个DNS服务器")
@@ -218,7 +253,7 @@ def main(domain, file, scan_subdomains, output):
         # 输出结果
         click.echo("\n[*] 检测完成")
         
-        # 保存结果到文件 - 添加异常处理
+        # 保存当前域名的结果到文件 - 添加异常处理
         try:
             with open(output, 'a+') as f:
                 f.write(f"域名: {domain}\n")
@@ -240,6 +275,7 @@ def main(domain, file, scan_subdomains, output):
                 else:
                     f.write("未发现存在域传送漏洞的DNS服务器\n")
                 f.write("-" * 30 + "\n")
+                f.flush()  # 确保数据立即写入文件
             
             # 输出到控制台
             if vulnerable_servers:
@@ -248,10 +284,12 @@ def main(domain, file, scan_subdomains, output):
                     click.echo(f"    - {result['domain']} -> {result['nameserver']}")
             else:
                 click.echo("\n[+] 未发现存在域传送漏洞的DNS服务器")
+            
+            click.echo(f"[+] {domain} 的检测结果已保存到: {output}")
         except Exception as e:
             click.echo(f"[!] 保存结果到文件失败: {str(e)}")
     
-    click.echo(f"\n[+] 结果已保存到: {output}")
+    click.echo(f"\n[+] 所有检测结果已保存到: {output}")
 
 if __name__ == '__main__':
     main()
