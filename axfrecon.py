@@ -116,7 +116,7 @@ def test_zone_transfer(domain: str, nameserver: str) -> bool:
     
     # 合并标准输出和错误输出，统一检查
     output = result.stdout + result.stderr
-    failed_features = ["Transfer failed", "timed out", "network unreachable", "host unreachable"]
+    failed_features = ["Transfer failed", "timed out", "network unreachable", "host unreachable", "not found"]
     for feature in failed_features:
         if feature in result.stdout or feature in result.stderr:
             return False
