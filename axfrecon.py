@@ -113,13 +113,14 @@ def test_zone_transfer(domain: str, nameserver: str) -> bool:
         )
     except FileNotFoundError as e:
         raise RuntimeError("未找到 'dig' 命令，请确保已安装 dnsutils 或 bind-utils 包。") from e
-
+    
     # 合并标准输出和错误输出，统一检查
     output = result.stdout + result.stderr
-    if "Transfer failed" in output or "timed out" in output or "network unreachable" in output:
-        return False
-    else:
-        return True
+    failed_features = ["Transfer failed", "timed out", "network unreachable", "host unreachable"]
+    for feature in failed_features:
+        if feature in result.stdout or feature in result.stderr:
+            return False
+    return True
 
 @click.command()
 @click.argument('domain', required=False)
