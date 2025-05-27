@@ -136,15 +136,28 @@ def main(domain, file, scan_subdomains, output):
     """DNS域传送漏洞检测工具"""
     domains = []
     
-    def remove_www_prefix(domain: str) -> str:
-        """移除域名开头的www.前缀"""
-        return domain[4:] if domain.startswith('www.') else domain
+    def normalize_domain(domain: str) -> str:
+        """规范化域名，移除http://、https://和www.前缀"""
+        # 移除http://和https://前缀
+        if domain.startswith('http://'):
+            domain = domain[7:]
+        elif domain.startswith('https://'):
+            domain = domain[8:]
+        
+        # 移除可能存在的www.前缀
+        if domain.startswith('www.'):
+            domain = domain[4:]
+            
+        # 移除可能存在的路径和参数
+        domain = domain.split('/')[0]
+        
+        return domain
 
     # 从文件读取域名或使用命令行参数
     if file:
         try:
             with open(file, 'r') as f:
-                domains = [remove_www_prefix(line.strip()) for line in f if line.strip()]
+                domains = [normalize_domain(line.strip()) for line in f if line.strip()]
             if not domains:
                 click.echo("[!] 文件中未找到有效域名")
                 # 创建一个空结果文件
@@ -166,7 +179,7 @@ def main(domain, file, scan_subdomains, output):
                 click.echo(f"[!] 无法创建输出文件: {str(e)}")
             return
     elif domain:
-        domains = [remove_www_prefix(domain)]
+        domains = [normalize_domain(domain)]
     else:
         click.echo("[!] 请提供域名或域名列表文件")
         # 创建一个错误报告文件
