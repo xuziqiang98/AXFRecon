@@ -121,7 +121,8 @@ def test_zone_transfer(domain: str, nameserver: str) -> bool:
                        "network unreachable", 
                        "host unreachable", 
                        "not found", 
-                       "connection refused"]
+                       "connection refused",
+                       "no servers could be reached"]
     for feature in failed_features:
         if feature in result.stdout or feature in result.stderr:
             return False
